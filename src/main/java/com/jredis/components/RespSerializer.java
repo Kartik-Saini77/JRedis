@@ -32,6 +32,7 @@ public class RespSerializer {
                     i += 2;
                     if (dataArr[i] == '*') {
                         for(int t=0; t<arrLen; t++) {
+                            i++;
                             int nestedLen = 0;
                             while (i < dataArr.length && dataArr[i] != '\r' && dataArr[i+1] != '\n') {
                                 nestedLen = nestedLen * 10 + (dataArr[i] - '0');

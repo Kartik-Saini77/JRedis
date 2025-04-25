@@ -70,23 +70,13 @@ public class TcpServer {
     }
 
     private void handleCommand(String[] command, Client client) {
-        String response = null;
-        switch (command[0]) {
-            case "PING":
-                response = commandHandler.ping(command);
-                break;
-            case "ECHO":
-                response = commandHandler.echo(command);
-                break;
-            case "SET":
-                response = commandHandler.set(command);
-                break;
-            case "GET":
-                response = commandHandler.get(command);
-                break;
-            default:
-                response = "-ERR unknown command\r\n";
-        }
+        String response = switch (command[0]) {
+            case "PING" -> commandHandler.ping(command);
+            case "ECHO" -> commandHandler.echo(command);
+            case "SET" -> commandHandler.set(command);
+            case "GET" -> commandHandler.get(command);
+            default -> "-ERR unknown command\r\n";
+        };
         if (response != null) {
             try {
                 client.outputStream.write(response.getBytes());
