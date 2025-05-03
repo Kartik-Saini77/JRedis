@@ -9,6 +9,13 @@ import java.util.List;
 @Component
 public class RespSerializer {
 
+    public String serializeBulkString(String command) {
+        int len = command.length();
+        String respHeader = "$" + len + "\r\n";
+
+        return respHeader + command + "\r\n";
+    }
+
     public List<String[]> deserialize(byte[] command) {
         String data = new String(command, StandardCharsets.UTF_8).trim();
         char[] dataArr = data.toCharArray();
