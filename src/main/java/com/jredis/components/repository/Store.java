@@ -1,18 +1,17 @@
-package com.jredis.components;
+package com.jredis.components.repository;
 
-import com.jredis.models.Values;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.jredis.components.services.RespSerializer;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Component
 public class Store {
     private final RespSerializer respSerializer;
-    Logger logger = LoggerFactory.getLogger(getClass());
     public ConcurrentHashMap<String, Values> map;
 
     public Store(RespSerializer respSerializer) {
@@ -29,7 +28,7 @@ public class Store {
             map.put(key, new Values(value, LocalDateTime.now(), LocalDateTime.MAX));
             return "+OK\r\n";
         } catch (Exception e) {
-            logger.error("Error setting value for key {}: {}", key, e.getMessage());
+            log.error("Error setting value for key {}: {}", key, e.getMessage());
             return "$-1\r\n";
         }
     }
@@ -42,7 +41,7 @@ public class Store {
 
             return "+OK\r\n";
         } catch (Exception e) {
-            logger.error("Error setting value for key {}: {}", key, e.getMessage());
+            log.error("Error setting value for key {}: {}", key, e.getMessage());
             return "$-1\r\n";
         }
     }
@@ -59,11 +58,11 @@ public class Store {
                 }
                 return respSerializer.serializeBulkString(value.value);
             } else {
-                logger.info("Key not found : {}", key);
+                log.info("Key not found : {}", key);
                 return "$-1\r\n";
             }
         } catch (Exception e) {
-            logger.error("Error getting value for key {}: {}", key, e.getMessage());
+            log.error("Error getting value for key {}: {}", key, e.getMessage());
             return "$-1\r\n";
         }
     }

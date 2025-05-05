@@ -1,4 +1,4 @@
-package com.jredis.components;
+package com.jredis.components.services;
 
 import org.springframework.stereotype.Component;
 
@@ -26,7 +26,6 @@ public class RespSerializer {
             try {
                 char curr = dataArr[i];
                 if (curr == '\u0000') {
-                    System.out.println("i : " + i);
                     break;
                 }
                 if (curr == '*') {
@@ -67,23 +66,27 @@ public class RespSerializer {
     private int getParts(char[] dataArr, int i, String[] subArray) {
         int j = 0, dataLen = dataArr.length, arrLen = subArray.length;
         while (i < dataLen && j < arrLen) {
-            if (dataArr[i] == '$') {
-                i++;
-                int len = 0;
-                while (i < dataLen && dataArr[i] != '\r' && dataArr[i+1] != '\n') {
-                    len = len * 10 + (dataArr[i] - '0');
+            try {
+                if (dataArr[i] == '$') {
                     i++;
+                    int len = 0;
+                    while (i < dataLen && dataArr[i] != '\r' && dataArr[i+1] != '\n') {
+                        len = len * 10 + (dataArr[i] - '0');
+                        i++;
+                    }
+                    i += 2;
+                    StringBuilder sb = new StringBuilder();
+                    for (int k = 0; k < len; k++) {
+                        sb.append(dataArr[i]);
+                        i++;
+                    }
+                    i += 2;
+                    subArray[j++] = sb.toString();
+                } else {
+                    break;
                 }
-                i += 2;
-                StringBuilder sb = new StringBuilder();
-                for (int k = 0; k < len; k++) {
-                    sb.append(dataArr[i]);
-                    i++;
-                }
-                i += 2;
-                subArray[j++] = sb.toString();
-            } else {
-                break;
+            } catch (Exception e) {
+                throw new RuntimeException("Error parsing RESP command: " + e.getMessage());
             }
         }
         return i;

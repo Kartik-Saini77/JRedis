@@ -1,4 +1,4 @@
-package com.jredis.models;
+package com.jredis.components.infra;
 
 import java.io.InputStream;
 import java.io.OutputStream;

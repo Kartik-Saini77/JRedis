@@ -1,4 +1,4 @@
-package com.jredis.models;
+package com.jredis.components.repository;
 
 import java.time.LocalDateTime;
 

@@ -1,17 +1,17 @@
-package com.jredis.components;
+package com.jredis.components.services;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.jredis.components.repository.Store;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 
+@Slf4j
 @Component
 public class CommandHandler {
 
     private final RespSerializer respSerializer;
     private final Store store;
-    Logger logger = LoggerFactory.getLogger(getClass());
 
     public CommandHandler(RespSerializer respSerializer, Store store) {
         this.respSerializer = respSerializer;
@@ -40,7 +40,7 @@ public class CommandHandler {
 
             return store.set(key, value);
         } catch (Exception e) {
-            logger.error("Error setting value for key {}: {}", command[1], e.getMessage());
+            log.error("Error setting value for key {}: {}", command[1], e.getMessage());
             return "$-1\r\n";
         }
     }
@@ -51,7 +51,7 @@ public class CommandHandler {
 
             return store.get(key);
         } catch (Exception e) {
-            logger.error("Error getting value for key {}: {}", command[1], e.getMessage());
+            log.error("Error getting value for key {}: {}", command[1], e.getMessage());
             return "$-1\r\n";
         }
     }

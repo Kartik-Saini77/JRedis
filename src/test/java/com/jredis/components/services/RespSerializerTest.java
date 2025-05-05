@@ -1,4 +1,4 @@
-package com.jredis.components;
+package com.jredis.components.services;
 
 import org.junit.jupiter.api.Test;
 

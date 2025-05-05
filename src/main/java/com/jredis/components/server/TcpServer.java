@@ -1,9 +1,9 @@
-package com.jredis.components;
+package com.jredis.components.server;
 
-import com.jredis.models.Client;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import com.jredis.components.infra.Client;
+import com.jredis.components.services.CommandHandler;
+import com.jredis.components.services.RespSerializer;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
@@ -12,12 +12,9 @@ import java.net.Socket;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @Component
 public class TcpServer {
-
-    @Value("${tcp.server.port}")
-    int port;
-    Logger logger = LoggerFactory.getLogger(getClass());
 
     private final RespSerializer respSerializer;
     private final CommandHandler commandHandler;
@@ -27,18 +24,19 @@ public class TcpServer {
         this.commandHandler = commandHandler;
     }
 
-    public void startServer() {
+    public void startServer(int port) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);
+            log.info("Server started on port {}", port);
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                logger.info("New client connected : {}", clientSocket.getInetAddress().getHostAddress());
+                log.info("New client connected : {}", clientSocket.getInetAddress().getHostAddress());
                 Client client = new Client(clientSocket, clientSocket.getInputStream(), clientSocket.getOutputStream());
                 CompletableFuture.runAsync(() -> handleClient(client));
             }
         } catch (IOException e) {
-            logger.error(e.getMessage());
+            log.error("Error starting server: {}", e.getMessage());
         }
     }
 
@@ -57,14 +55,14 @@ public class TcpServer {
                     }
                 }
             }
-            logger.info("Client disconnected : {}", client.id);
+            log.info("Client disconnected : {}", client.id);
         } catch (IOException e) {
-            logger.error("Error handling client {}: {}", client.id, e.getMessage());
+            log.error("Error handling client {}: {}", client.id, e.getMessage());
         } finally {
             try {
                 client.socket.close();
             } catch (IOException e) {
-                logger.error("Error closing client socket: {}", e.getMessage());
+                log.error("Error closing client socket: {}", e.getMessage());
             }
         }
     }
@@ -81,7 +79,7 @@ public class TcpServer {
             try {
                 client.outputStream.write(response.getBytes());
             } catch (IOException e) {
-                logger.error("Error sending response to client {}: {}", client.id, e.getMessage());
+                log.error("Error sending response to client {}: {}", client.id, e.getMessage());
             }
         }
     }
