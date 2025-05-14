@@ -1,5 +1,6 @@
 package com.jredis.components.services;
 
+import com.jredis.components.infra.RedisConfig;
 import com.jredis.components.repository.Store;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -11,10 +12,12 @@ import java.util.Arrays;
 public class CommandHandler {
 
     private final RespSerializer respSerializer;
+    private final RedisConfig redisConfig;
     private final Store store;
 
-    public CommandHandler(RespSerializer respSerializer, Store store) {
+    public CommandHandler(RespSerializer respSerializer, RedisConfig redisConfig, Store store) {
         this.respSerializer = respSerializer;
+        this.redisConfig = redisConfig;
         this.store = store;
     }
 
@@ -54,5 +57,13 @@ public class CommandHandler {
             log.error("Error getting value for key {}: {}", command[1], e.getMessage());
             return "$-1\r\n";
         }
+    }
+
+    public String info(String[] command) {
+        int replication = Arrays.stream(command).map(String::toLowerCase).toList().indexOf("replication");
+        if (replication > -1) {
+            return respSerializer.serializeBulkString("role:" + redisConfig.getRole());
+        }
+        return "$-1\r\n";
     }
 }

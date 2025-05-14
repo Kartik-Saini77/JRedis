@@ -1,5 +1,7 @@
 package com.jredis;
 
+import com.jredis.components.infra.RedisConfig;
+import com.jredis.components.infra.Role;
 import com.jredis.components.server.TcpServer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -31,6 +33,11 @@ public class Main {
     CommandLineRunner commandLineRunner(ApplicationContext context) {
         return args -> {
             TcpServer tcpServer = context.getBean(TcpServer.class);
+            RedisConfig redisConfig = context.getBean(RedisConfig.class);
+
+            redisConfig.setRole(Role.master);
+            redisConfig.setPort(port);
+
             tcpServer.startServer(port);
         };
     }

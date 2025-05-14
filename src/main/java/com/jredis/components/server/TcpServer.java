@@ -73,6 +73,7 @@ public class TcpServer {
             case "ECHO" -> commandHandler.echo(command);
             case "SET" -> commandHandler.set(command);
             case "GET" -> commandHandler.get(command);
+            case "INFO" -> commandHandler.info(command);
             default -> "-ERR unknown command\r\n";
         };
         if (response != null) {
