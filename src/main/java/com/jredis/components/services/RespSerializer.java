@@ -16,6 +16,15 @@ public class RespSerializer {
         return respHeader + command + "\r\n";
     }
 
+    public String serializeArray(String[] command) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("*").append(command.length).append("\r\n");
+        for (String cmd : command) {
+            sb.append(serializeBulkString(cmd));
+        }
+        return sb.toString();
+    }
+
     public List<String[]> deserialize(byte[] command) {
         String data = new String(command, StandardCharsets.UTF_8).trim();
         char[] dataArr = data.toCharArray();

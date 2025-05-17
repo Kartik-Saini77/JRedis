@@ -14,12 +14,12 @@ class RespSerializerTest {
         String ping = "*1\r\n$4\r\nPING\r\n";
         List<String[]> result = respSerializer.deserialize(ping.getBytes());
 
-        for (String[] strings : result) {
-            for (String string : strings) {
-                System.out.print(string + " ");
-            }
-            System.out.println();
-        }
+//        for (String[] strings : result) {
+//            for (String string : strings) {
+//                System.out.print(string + " ");
+//            }
+//            System.out.println();
+//        }
 
         assertEquals(1, result.size());
         assertEquals(1, result.getFirst().length);
@@ -32,12 +32,12 @@ class RespSerializerTest {
 
         List<String[]> result = respSerializer.deserialize(multipleCommands.getBytes());
 
-        for (String[] strings : result) {
-            for (String string : strings) {
-                System.out.print(string + " ");
-            }
-            System.out.println();
-        }
+//        for (String[] strings : result) {
+//            for (String string : strings) {
+//                System.out.print(string + " ");
+//            }
+//            System.out.println();
+//        }
 
         assertEquals(2, result.size());
         assertEquals(3, result.getFirst().length);

@@ -62,7 +62,13 @@ public class CommandHandler {
     public String info(String[] command) {
         int replication = Arrays.stream(command).map(String::toLowerCase).toList().indexOf("replication");
         if (replication > -1) {
-            return respSerializer.serializeBulkString("role:" + redisConfig.getRole());
+            return respSerializer.serializeArray(new String[]{
+                    "role:"+redisConfig.getRole().toString(),
+                    "master_host:"+redisConfig.getMasterHost(),
+                    "master_port:"+redisConfig.getMasterPort(),
+                    "master_replid:"+redisConfig.getMasterReplId(),
+                    "master_repl_offset:"+redisConfig.getMasterReplOffset()
+            });
         }
         return "$-1\r\n";
     }

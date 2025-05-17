@@ -13,16 +13,33 @@ import org.springframework.context.annotation.Bean;
 @Slf4j
 @SpringBootApplication
 public class Main {
-    private static int port = 8080;
+    private static int port = 6379;
+    private static Role role = Role.master;
+    private static String masterHost = "localhost";
+    private static int masterPort = 6379;
 
     public static void main(String[] args) {
+
         for(int i=0; i<args.length; i++) {
-            if(args[i].equals("--port")) {
-                try {
-                    port = Integer.parseInt(args[i+1]);
-                } catch (NumberFormatException e) {
-                    log.error("Invalid port number provided. Using default port 8080.");
-                }
+            switch(args[i]) {
+                case "--port" :
+                    try {
+                        port = Integer.parseInt(args[i+1]);
+                        if (role.equals(Role.master))
+                            masterPort = port;
+                    } catch (NumberFormatException e) {
+                        log.error("Invalid port number provided. Using default port 6380.");
+                    }
+                    break;
+                case "--replicaof" :
+                    role = Role.slave;
+                    masterHost = args[i+1].split(" ")[0];
+                    try {
+                        masterPort = Integer.parseInt(args[i+1].split(" ")[1]);
+                    } catch (NumberFormatException e) {
+                        log.error("Invalid port number provided for master. Using default port 6379.");
+                    }
+                    break;
             }
         }
 
@@ -35,8 +52,10 @@ public class Main {
             TcpServer tcpServer = context.getBean(TcpServer.class);
             RedisConfig redisConfig = context.getBean(RedisConfig.class);
 
-            redisConfig.setRole(Role.master);
             redisConfig.setPort(port);
+            redisConfig.setRole(role);
+            redisConfig.setMasterHost(masterHost);
+            redisConfig.setMasterPort(masterPort);
 
             tcpServer.startServer(port);
         };
