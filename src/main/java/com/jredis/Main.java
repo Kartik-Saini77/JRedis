@@ -2,7 +2,8 @@ package com.jredis;
 
 import com.jredis.components.infra.RedisConfig;
 import com.jredis.components.infra.Role;
-import com.jredis.components.server.TcpServer;
+import com.jredis.components.server.MasterTcpServer;
+import com.jredis.components.server.SlaveTcpServer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -49,7 +50,8 @@ public class Main {
     @Bean
     CommandLineRunner commandLineRunner(ApplicationContext context) {
         return args -> {
-            TcpServer tcpServer = context.getBean(TcpServer.class);
+            MasterTcpServer master = context.getBean(MasterTcpServer.class);
+            SlaveTcpServer slave = context.getBean(SlaveTcpServer.class);
             RedisConfig redisConfig = context.getBean(RedisConfig.class);
 
             redisConfig.setPort(port);
@@ -57,7 +59,10 @@ public class Main {
             redisConfig.setMasterHost(masterHost);
             redisConfig.setMasterPort(masterPort);
 
-            tcpServer.startServer(port);
+            if (role.equals(Role.master))
+                master.startServer();
+            else
+                slave.startServer();
         };
     }
 }

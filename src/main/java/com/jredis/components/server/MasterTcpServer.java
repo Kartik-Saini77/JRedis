@@ -1,6 +1,7 @@
 package com.jredis.components.server;
 
 import com.jredis.components.infra.Client;
+import com.jredis.components.infra.RedisConfig;
 import com.jredis.components.services.CommandHandler;
 import com.jredis.components.services.RespSerializer;
 import lombok.extern.slf4j.Slf4j;
@@ -14,17 +15,20 @@ import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
-public class TcpServer {
+public class MasterTcpServer {
 
     private final RespSerializer respSerializer;
     private final CommandHandler commandHandler;
+    private final RedisConfig redisConfig;
 
-    public TcpServer(RespSerializer respSerializer, CommandHandler commandHandler) {
+    public MasterTcpServer(RespSerializer respSerializer, CommandHandler commandHandler, RedisConfig redisConfig) {
         this.respSerializer = respSerializer;
         this.commandHandler = commandHandler;
+        this.redisConfig = redisConfig;
     }
 
-    public void startServer(int port) {
+    public void startServer() {
+        int port = redisConfig.getPort();
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);
             log.info("Server started on port {}", port);
