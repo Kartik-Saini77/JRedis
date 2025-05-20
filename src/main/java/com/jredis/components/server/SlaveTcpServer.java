@@ -1,6 +1,7 @@
 package com.jredis.components.server;
 
 import com.jredis.components.infra.Client;
+import com.jredis.components.infra.ConnectionPool;
 import com.jredis.components.infra.RedisConfig;
 import com.jredis.components.services.CommandHandler;
 import com.jredis.components.services.RespSerializer;
@@ -21,11 +22,13 @@ public class SlaveTcpServer {
     private final RespSerializer respSerializer;
     private final CommandHandler commandHandler;
     private final RedisConfig redisConfig;
+    private final ConnectionPool connectionPool;
 
-    public SlaveTcpServer(RespSerializer respSerializer, CommandHandler commandHandler, RedisConfig redisConfig) {
+    public SlaveTcpServer(RespSerializer respSerializer, CommandHandler commandHandler, RedisConfig redisConfig, ConnectionPool connectionPool) {
         this.respSerializer = respSerializer;
         this.commandHandler = commandHandler;
         this.redisConfig = redisConfig;
+        this.connectionPool = connectionPool;
     }
 
     public void startServer() {
@@ -94,6 +97,7 @@ public class SlaveTcpServer {
 
     public void handleClient(Client client) {
         try {
+            connectionPool.addClient(client);
             while (true) {
                 byte[] buffer = new byte[1024];
                 int bytesRead = client.inputStream.read(buffer);
@@ -107,6 +111,8 @@ public class SlaveTcpServer {
                     }
                 }
             }
+            connectionPool.removeClient(client);
+            connectionPool.removeSlave(client);
             log.info("Client disconnected : {}", client.id);
         } catch (IOException e) {
             log.error("Error handling client {}: {}", client.id, e.getMessage());
@@ -126,6 +132,7 @@ public class SlaveTcpServer {
             case "SET" -> "-READONLY You can't write against a replica.\r\n";
             case "GET" -> commandHandler.get(command);
             case "INFO" -> commandHandler.info(command);
+            case "REPLCONF" -> commandHandler.replconf(command, client);
             default -> "-ERR unknown command\r\n";
         };
         if (response != null) {

@@ -1,6 +1,9 @@
 package com.jredis.components.services;
 
+import com.jredis.components.infra.Client;
+import com.jredis.components.infra.ConnectionPool;
 import com.jredis.components.infra.RedisConfig;
+import com.jredis.components.infra.Slave;
 import com.jredis.components.repository.Store;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -12,11 +15,13 @@ import java.util.Arrays;
 public class CommandHandler {
 
     private final RespSerializer respSerializer;
+    private final ConnectionPool connectionPool;
     private final RedisConfig redisConfig;
     private final Store store;
 
-    public CommandHandler(RespSerializer respSerializer, RedisConfig redisConfig, Store store) {
+    public CommandHandler(RespSerializer respSerializer, ConnectionPool connectionPool, RedisConfig redisConfig, Store store) {
         this.respSerializer = respSerializer;
+        this.connectionPool = connectionPool;
         this.redisConfig = redisConfig;
         this.store = store;
     }
@@ -71,5 +76,32 @@ public class CommandHandler {
             });
         }
         return "$-1\r\n";
+    }
+
+    public String replconf(String[] command, Client client) {
+        switch (command[1]) {
+            case "listening-port" :
+                connectionPool.removeClient(client);
+                Slave s = new Slave(client);
+                connectionPool.addSlave(s);
+                return "+OK\r\n";
+            case "capa" :
+                Slave slave = null;
+                for(Slave ss : connectionPool.getSlaves()) {
+                    if (ss.connection.equals(client)) {
+                        slave = ss;
+                        break;
+                    }
+                }
+
+                for(int i=0; i<command.length; i++) {
+                    if (command[i].equalsIgnoreCase("capa")) {
+                        assert slave != null;
+                        slave.capabilities.add(command[i+1]);
+                    }
+                }
+                return "+OK\r\n";
+        }
+        return "+OK\r\n";
     }
 }
