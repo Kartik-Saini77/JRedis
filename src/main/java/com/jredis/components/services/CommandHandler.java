@@ -9,10 +9,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import java.util.Base64;
 
 @Slf4j
 @Component
 public class CommandHandler {
+
+    private static final String emptyRdbFile = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==";  // temp, will be replaced with actual rdb file
 
     private final RespSerializer respSerializer;
     private final ConnectionPool connectionPool;
@@ -103,5 +106,24 @@ public class CommandHandler {
                 return "+OK\r\n";
         }
         return "+OK\r\n";
+    }
+
+    public ResponseDto psync(String[] command) {
+        String replIdMaster = command[1];
+        String replOffsetMaster = command[2];
+
+        if (replIdMaster.equals("?") && replOffsetMaster.equals("-1")) {
+            String replId = redisConfig.getMasterReplId();
+            long replOffset = redisConfig.getMasterReplOffset();
+
+            byte[] rdbFile = Base64.getDecoder().decode(emptyRdbFile);
+            byte[] header = ("$" + rdbFile.length + "\r\n").getBytes();
+            byte[] rdb = new byte[header.length + rdbFile.length];
+            System.arraycopy(header, 0, rdb, 0, header.length);
+            System.arraycopy(rdbFile, 0, rdb, header.length, rdbFile.length);
+
+            return new ResponseDto("+FULLRESYNC " + replId + " " + replOffset + "\r\n", rdb);
+        }
+        return new ResponseDto("+Options are not supported yet\r\n");
     }
 }

@@ -5,6 +5,7 @@ import com.jredis.components.infra.ConnectionPool;
 import com.jredis.components.infra.RedisConfig;
 import com.jredis.components.services.CommandHandler;
 import com.jredis.components.services.RespSerializer;
+import com.jredis.components.services.ResponseDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -126,6 +127,7 @@ public class SlaveTcpServer {
     }
 
     private void handleCommand(String[] command, Client client) {
+        byte[] data = null;
         String response = switch (command[0]) {
             case "PING" -> commandHandler.ping(command);
             case "ECHO" -> commandHandler.echo(command);
@@ -133,14 +135,13 @@ public class SlaveTcpServer {
             case "GET" -> commandHandler.get(command);
             case "INFO" -> commandHandler.info(command);
             case "REPLCONF" -> commandHandler.replconf(command, client);
+            case "PSYNC" -> {
+                ResponseDto resDto = commandHandler.psync(command);
+                data = resDto.getData();
+                yield resDto.getResponse();
+            }
             default -> "-ERR unknown command\r\n";
         };
-        if (response != null) {
-            try {
-                client.outputStream.write(response.getBytes());
-            } catch (IOException e) {
-                log.error("Error sending response to client {}: {}", client.id, e.getMessage());
-            }
-        }
+        client.send(response, data);
     }
 }
