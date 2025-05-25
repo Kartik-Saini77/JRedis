@@ -3,6 +3,7 @@ package com.jredis.components.server;
 import com.jredis.components.infra.Client;
 import com.jredis.components.infra.ConnectionPool;
 import com.jredis.components.infra.RedisConfig;
+import com.jredis.components.infra.Slave;
 import com.jredis.components.services.CommandHandler;
 import com.jredis.components.services.RespSerializer;
 import com.jredis.components.services.ResponseDto;
@@ -13,6 +14,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -85,15 +87,85 @@ public class SlaveTcpServer {
             String psync = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
             data = psync.getBytes();
             outputStream.write(data);
-            bytesRead = inputStream.read(inputBuffer);
-            response = new String(inputBuffer, 0, bytesRead, StandardCharsets.UTF_8);
-            log.info(response);
 
-//            handlePsyncResponse(response, inputStream, outputStream);
+            List<Integer> res = handlePsyncResponse(inputStream);
+
+            while(master.isConnected()) {
+                int offset = 1;
+                StringBuilder sb = new StringBuilder();
+                List<Byte> bytes = new ArrayList<>();
+
+                while(true) {
+                    int b = inputStream.read();
+                    if (b == '*') {
+                        break;
+                    }
+                    offset++;
+                    bytes.add((byte) b);
+                    if (inputStream.available() <= 0) {
+                        break;
+                    }
+                }
+
+                for (Byte b : bytes) {
+                    sb.append((char) (b & 0xFF));
+                }
+
+                if (bytes.isEmpty())
+                    continue;
+                String command = sb.toString();
+                String[] parts = command.split("\r\n");
+
+                if (command.equals("+OK\r\n"))
+                    continue;
+                String[] commandArray = respSerializer.parseArray(parts);
+                String commandResult = handleCommandFromMaster(commandArray, master);
+            }
 
         } catch (Exception e) {
             log.error("Error connecting to master: {}", e.getMessage());
         }
+    }
+
+    private String handleCommandFromMaster(String[] commandArray, Socket master) {
+        String cmd = commandArray[0];
+        cmd = cmd.toUpperCase();
+        String res = switch (cmd) {
+            case "SET" -> {
+                String response = commandHandler.set(commandArray);
+                CompletableFuture.runAsync(() -> propagate(commandArray));
+                yield response;
+            }
+            default -> "-ERR unknown command\r\n";
+        };
+
+        return res;
+    }
+
+    private void propagate(String[] command) {
+        String commandRespString = respSerializer.serializeArray(command);
+        try {
+            for(Slave slave : connectionPool.getSlaves()) {
+                slave.send(commandRespString.getBytes());
+            }
+        } catch (IOException e) {
+            log.error("Error propagating command to slaves: {}", e.getMessage());
+        }
+    }
+
+    private List<Integer> handlePsyncResponse(InputStream inputStream) throws IOException {
+        List<Integer> res = new ArrayList<>();
+        while(true) {
+            if(inputStream.available() <= 0) {
+                continue;
+            }
+            int b = inputStream.read();
+            res.add(b);
+            if (b == '*') {
+                break;
+            }
+        }
+        return res;
     }
 
     public void handleClient(Client client) {

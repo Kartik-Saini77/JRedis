@@ -41,5 +41,6 @@ public class ConnectionPool {
                 return removeSlave(slave);
             }
         }
+        return false;
     }
 }

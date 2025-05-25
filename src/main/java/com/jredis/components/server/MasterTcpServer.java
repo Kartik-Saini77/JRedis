@@ -3,6 +3,7 @@ package com.jredis.components.server;
 import com.jredis.components.infra.Client;
 import com.jredis.components.infra.ConnectionPool;
 import com.jredis.components.infra.RedisConfig;
+import com.jredis.components.infra.Slave;
 import com.jredis.components.services.CommandHandler;
 import com.jredis.components.services.RespSerializer;
 import com.jredis.components.services.ResponseDto;
@@ -83,7 +84,11 @@ public class MasterTcpServer {
         String response = switch (command[0]) {
             case "PING" -> commandHandler.ping(command);
             case "ECHO" -> commandHandler.echo(command);
-            case "SET" -> commandHandler.set(command);
+            case "SET" -> {
+                String res = commandHandler.set(command);
+                CompletableFuture.runAsync(() -> propagate(command));
+                yield res;
+            }
             case "GET" -> commandHandler.get(command);
             case "INFO" -> commandHandler.info(command);
             case "REPLCONF" -> commandHandler.replconf(command, client);
@@ -95,5 +100,16 @@ public class MasterTcpServer {
             default -> "-ERR unknown command\r\n";
         };
         client.send(response, data);
+    }
+
+    private void propagate(String[] command) {
+        String commandRespString = respSerializer.serializeArray(command);
+        try {
+            for(Slave slave : connectionPool.getSlaves()) {
+                slave.send(commandRespString.getBytes());
+            }
+        } catch (IOException e) {
+            log.error("Error propagating command to slaves: {}", e.getMessage());
+        }
     }
 }

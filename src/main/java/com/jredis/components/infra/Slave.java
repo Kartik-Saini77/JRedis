@@ -1,5 +1,6 @@
 package com.jredis.components.infra;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
@@ -14,5 +15,11 @@ public class Slave {
     public Slave(Client client) {
         this.connection = client;
         this.capabilities = new ArrayList<String>();
+    }
+
+    public void send(byte[] bytes) throws IOException {
+        if(bytes != null) {
+            this.connection.outputStream.write(bytes);
+        }
     }
 }
