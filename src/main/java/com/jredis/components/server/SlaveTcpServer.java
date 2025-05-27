@@ -120,6 +120,25 @@ public class SlaveTcpServer {
                     continue;
                 String[] commandArray = respSerializer.parseArray(parts);
                 String commandResult = handleCommandFromMaster(commandArray, master);
+
+                if (commandArray.length >= 2 && commandArray[0].equals("REPLCONF") && commandArray[1].equals("GETACK")) {
+                    if (commandResult != null && !commandResult.isEmpty())
+                        outputStream.write(commandResult.getBytes());
+                    offset++;
+                    List<Byte> leftOverBytes = new ArrayList<>();
+                    while(true) {
+                        if (inputStream.available() <= 0) {
+                            break;
+                        }
+                        byte b = (byte) inputStream.read();
+                        leftOverBytes.add((byte) b);
+                        if ((int) b == '*') {
+                            break;
+                        }
+                        offset++;
+                    }
+                }
+                redisConfig.setMasterReplOffset(offset + redisConfig.getMasterReplOffset());
             }
 
         } catch (Exception e) {
@@ -130,14 +149,19 @@ public class SlaveTcpServer {
     private String handleCommandFromMaster(String[] commandArray, Socket master) {
         String cmd = commandArray[0];
         cmd = cmd.toUpperCase();
-        String res = switch (cmd) {
-            case "SET" -> {
-                String response = commandHandler.set(commandArray);
+        String res = "";
+        switch (cmd) {
+            case "SET" :
+                commandHandler.set(commandArray);
                 CompletableFuture.runAsync(() -> propagate(commandArray));
-                yield response;
-            }
-            default -> "-ERR unknown command\r\n";
-        };
+                break;
+            case "REPLCONF" :
+                res = commandHandler.replconf(commandArray, null);
+                break;
+            default :
+                log.error("Unknown command : {}", cmd);
+                break;
+        }
 
         return res;
     }

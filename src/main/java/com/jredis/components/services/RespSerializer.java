@@ -25,6 +25,10 @@ public class RespSerializer {
         return sb.toString();
     }
 
+    public String serializeInteger(int value) {
+        return ":" + value + "\r\n";
+    }
+
     public List<String[]> deserialize(byte[] command) {
         String data = new String(command, StandardCharsets.UTF_8).trim();
         char[] dataArr = data.toCharArray();

@@ -97,6 +97,7 @@ public class MasterTcpServer {
                 data = resDto.getData();
                 yield resDto.getResponse();
             }
+            case "WAIT" -> respSerializer.serializeInteger(connectionPool.slavesThatAreCaughtUp);
             default -> "-ERR unknown command\r\n";
         };
         client.send(response, data);

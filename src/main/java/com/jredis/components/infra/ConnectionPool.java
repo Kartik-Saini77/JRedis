@@ -11,10 +11,17 @@ import java.util.Set;
 public class ConnectionPool {
     private Set<Client> clients;
     private Set<Slave> slaves;
+    public int slavesThatAreCaughtUp = 0;
+    public int bytesSentToSlaves = 0;
 
     public ConnectionPool() {
         this.clients = new HashSet<>();
         this.slaves = new HashSet<>();
+    }
+
+    public void slaveAck(int ackResponse) {
+        if (this.bytesSentToSlaves == ackResponse)
+            slavesThatAreCaughtUp++;
     }
 
     public void addClient(Client client) {
