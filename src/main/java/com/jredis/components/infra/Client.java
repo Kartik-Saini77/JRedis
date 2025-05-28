@@ -32,4 +32,13 @@ public class Client {
             log.error("Error sending response to master: {}", e.getMessage());
         }
     }
+
+    public void send(byte[] data) {
+        try {
+            if (data != null)
+                outputStream.write(data);
+        } catch (IOException e) {
+            log.error("Error sending response to master: {}", e.getMessage());
+        }
+    }
 }

@@ -8,8 +8,11 @@ import com.jredis.components.repository.Store;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Component
@@ -86,16 +89,15 @@ public class CommandHandler {
             case "GETACK" :
                 String[] replConfAck = new String[]{"REPLCONF", "ACK", redisConfig.getMasterReplOffset()+""};
                 return respSerializer.serializeArray(replConfAck);
-//            case "ACK" :
-//                int ackResponse = Integer.parseInt(command[2]);
-//                connectionPool.slaveAck(ackResponse);
-//                String[] ack = new String[]{"REPLCONF", "ACK", redisConfig.getMasterReplOffset()+""};
-//                return respSerializer.serializeArray(ack);
+            case "ACK" :
+                int ackResponse = Integer.parseInt(command[2]);
+                connectionPool.slaveAck(ackResponse);
+                return "";
             case "listening-port" :
                 connectionPool.removeClient(client);
                 Slave s = new Slave(client);
                 connectionPool.addSlave(s);
-                return "+OK\r\n";
+                break;
             case "capa" :
                 Slave slave = null;
                 for(Slave ss : connectionPool.getSlaves()) {
@@ -111,7 +113,7 @@ public class CommandHandler {
                         slave.capabilities.add(command[i+1]);
                     }
                 }
-                return "+OK\r\n";
+                break;
         }
         return "+OK\r\n";
     }
@@ -130,8 +132,43 @@ public class CommandHandler {
             System.arraycopy(header, 0, rdb, 0, header.length);
             System.arraycopy(rdbFile, 0, rdb, header.length, rdbFile.length);
 
+            connectionPool.slavesThatAreCaughtUp++;
+
             return new ResponseDto("+FULLRESYNC " + replId + " " + replOffset + "\r\n", rdb);
         }
         return new ResponseDto("+Options are not supported yet\r\n");
+    }
+
+    public String wait(String[] command, Instant now) {
+        String[] getAckArray = new String[]{"REPLCONF", "GETACK", "*"};
+        byte[] getAck = respSerializer.serializeArray(getAckArray).getBytes();
+        int bufferSize = getAck.length;
+
+        int requiredSlaves = Integer.parseInt(command[1]);
+        int timeout = Integer.parseInt(command[2]);
+
+        for(Slave slave : connectionPool.getSlaves()) {
+            CompletableFuture.runAsync(() -> {
+                try {
+                    slave.connection.send(getAck);
+                } catch (Exception e) {
+                    log.error("Error sending REPLCONF GETACK to slave {}: {}", slave.connection.id, e.getMessage());
+                }
+            });
+        }
+
+        int res = 0;
+        while (Duration.between(now, Instant.now()).toMillis() < timeout) {
+            if (res >= requiredSlaves)
+                break;
+            res = connectionPool.slavesThatAreCaughtUp;
+        }
+        connectionPool.bytesSentToSlaves += bufferSize;
+        if (res >= requiredSlaves) {
+            return respSerializer.serializeInteger(res);
+        } else {
+            log.warn("Timeout waiting for slaves to catch up. Required: {}, Got: {}", requiredSlaves, res);
+            return respSerializer.serializeInteger(res);
+        }
     }
 }

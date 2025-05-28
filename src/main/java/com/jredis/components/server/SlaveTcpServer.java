@@ -131,7 +131,7 @@ public class SlaveTcpServer {
                             break;
                         }
                         byte b = (byte) inputStream.read();
-                        leftOverBytes.add((byte) b);
+                        leftOverBytes.add(b);
                         if ((int) b == '*') {
                             break;
                         }
@@ -146,17 +146,20 @@ public class SlaveTcpServer {
         }
     }
 
-    private String handleCommandFromMaster(String[] commandArray, Socket master) {
-        String cmd = commandArray[0];
+    private String handleCommandFromMaster(String[] command, Socket master) {
+        String cmd = command[0];
         cmd = cmd.toUpperCase();
         String res = "";
         switch (cmd) {
             case "SET" :
-                commandHandler.set(commandArray);
-                CompletableFuture.runAsync(() -> propagate(commandArray));
+                commandHandler.set(command);
+                String respArray = respSerializer.serializeArray(command);
+                byte[] bytes = respArray.getBytes();
+                connectionPool.bytesSentToSlaves += bytes.length;
+                CompletableFuture.runAsync(() -> propagate(command));
                 break;
             case "REPLCONF" :
-                res = commandHandler.replconf(commandArray, null);
+                res = commandHandler.replconf(command, null);
                 break;
             default :
                 log.error("Unknown command : {}", cmd);

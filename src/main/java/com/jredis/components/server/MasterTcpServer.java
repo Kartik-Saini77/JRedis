@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -86,6 +87,9 @@ public class MasterTcpServer {
             case "ECHO" -> commandHandler.echo(command);
             case "SET" -> {
                 String res = commandHandler.set(command);
+                String respArray = respSerializer.serializeArray(command);
+                byte[] bytes = respArray.getBytes();
+                connectionPool.bytesSentToSlaves += bytes.length;
                 CompletableFuture.runAsync(() -> propagate(command));
                 yield res;
             }
@@ -97,7 +101,14 @@ public class MasterTcpServer {
                 data = resDto.getData();
                 yield resDto.getResponse();
             }
-            case "WAIT" -> respSerializer.serializeInteger(connectionPool.slavesThatAreCaughtUp);
+            case "WAIT" -> {
+                if (connectionPool.bytesSentToSlaves == 0) {
+                    yield respSerializer.serializeInteger(connectionPool.slavesThatAreCaughtUp);
+                }
+                String res = commandHandler.wait(command, Instant.now());
+                connectionPool.slavesThatAreCaughtUp = 0;
+                yield res;
+            }
             default -> "-ERR unknown command\r\n";
         };
         client.send(response, data);
