@@ -69,7 +69,7 @@ public class SlaveTcpServer {
             log.info(response);
 
             // Part 2 of the handshake
-            String replconf = "*3\r\n$8\r\nREPLCONF\r\n$4\r\nLISTENING\r\n$" + ("" + redisConfig.getPort()).length() + "\r\n" + redisConfig.getPort() + "\r\n";
+            String replconf = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" + ("" + redisConfig.getPort()).length() + "\r\n" + redisConfig.getPort() + "\r\n";
             data = replconf.getBytes();
             outputStream.write(data);
             bytesRead = inputStream.read(inputBuffer);

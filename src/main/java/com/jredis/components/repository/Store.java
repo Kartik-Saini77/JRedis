@@ -66,4 +66,20 @@ public class Store {
             return "$-1\r\n";
         }
     }
+
+    public Values getValue(String key) {
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            Values value = map.get(key);
+
+            if (value != null && value.expiresAt.isBefore(now)) {
+                map.remove(key);
+                return null;
+            }
+            return value;
+        } catch (Exception e) {
+            log.error("Error getting value for key {}: {}", key, e.getMessage());
+            return null;
+        }
+    }
 }

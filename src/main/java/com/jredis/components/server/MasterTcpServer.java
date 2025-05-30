@@ -84,6 +84,7 @@ public class MasterTcpServer {
         byte[] data = null;
         String response = switch (command[0]) {
             case "PING" -> commandHandler.ping(command);
+            case "INCR" -> commandHandler.incr(command);
             case "ECHO" -> commandHandler.echo(command);
             case "SET" -> {
                 String res = commandHandler.set(command);

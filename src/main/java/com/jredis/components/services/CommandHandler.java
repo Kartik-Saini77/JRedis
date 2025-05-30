@@ -5,6 +5,7 @@ import com.jredis.components.infra.ConnectionPool;
 import com.jredis.components.infra.RedisConfig;
 import com.jredis.components.infra.Slave;
 import com.jredis.components.repository.Store;
+import com.jredis.components.repository.Values;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -169,6 +170,25 @@ public class CommandHandler {
         } else {
             log.warn("Timeout waiting for slaves to catch up. Required: {}, Got: {}", requiredSlaves, res);
             return respSerializer.serializeInteger(res);
+        }
+    }
+
+    public String incr(String[] command) {
+        String key = command[1];
+        try {
+            Values value = store.getValue(command[1]);
+            if (value == null) {
+                store.set(key, "0");
+                value = store.getValue(key);
+            }
+
+            int val = Integer.parseInt(value.value);
+            val++;
+            value.value = val+"";
+
+            return respSerializer.serializeInteger(val);
+        } catch (Exception e) {
+            return "-ERR value is not an integer or out of range\r\n";
         }
     }
 }
