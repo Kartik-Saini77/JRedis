@@ -15,6 +15,6 @@ public class RedisConfig {
     private int port;
     private String masterHost;
     private int masterPort;
-    private final String masterReplId = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().substring(0, 8);
+    private String masterReplId = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().substring(0, 8);
     private long masterReplOffset = 0L;
 }

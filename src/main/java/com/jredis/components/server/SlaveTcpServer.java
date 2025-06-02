@@ -89,6 +89,15 @@ public class SlaveTcpServer {
             outputStream.write(data);
 
             List<Integer> res = handlePsyncResponse(inputStream);
+            byte[] byteArray = new byte[res.size()];
+            for (int i = 0; i < res.size(); i++) {
+                byteArray[i] = res.get(i).byteValue();
+            }
+            String responseStr = new String(byteArray, StandardCharsets.UTF_8);
+            String[] responseArray = responseStr.split("[ \r\n]+");
+
+            redisConfig.setMasterReplId(responseArray[1]);
+            redisConfig.setMasterReplOffset(Integer.parseInt(responseArray[2]));
 
             while(master.isConnected()) {
                 int offset = 1;
@@ -182,14 +191,10 @@ public class SlaveTcpServer {
 
     private List<Integer> handlePsyncResponse(InputStream inputStream) throws IOException {
         List<Integer> res = new ArrayList<>();
-        while(true) {
-            if(inputStream.available() <= 0) {
-                continue;
-            }
+        while (inputStream.available() > 0) {
             int b = inputStream.read();
-            res.add(b);
-            if (b == '*') {
-                break;
+            if (b != -1) {
+                res.add(b);
             }
         }
         return res;

@@ -14,7 +14,9 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.Instant;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
@@ -81,9 +83,70 @@ public class MasterTcpServer {
     }
 
     private void handleCommand(String[] command, Client client) {
+        if (!client.transactionalContext) {
+            ResponseDto responseDto = caseHandler(command, client);
+            client.send(responseDto);
+        } else if (!isTransactionalControlCommand(command[0])) {
+            client.commandQueue.offer(command);
+            client.send("+QUEUED\r\n");
+        } else {
+            transactionController(command, client);
+        }
+    }
+
+    private boolean isTransactionalControlCommand(String s) {
+        return switch (s) {
+            case "EXEC", "DISCARD" -> true;
+            default -> false;
+        };
+    }
+
+    private void transactionController(String[] command, Client client) {
+        switch (command[0]) {
+            case "EXEC" -> {
+                if (client.commandQueue.isEmpty()) {
+                    client.send("*0\r\n");
+                    client.endTransaction();
+                    return;
+                }
+
+                Queue<String[]> commands = new LinkedList<>(client.commandQueue);
+
+                //execute the transaction
+
+
+                client.endTransaction();
+                while(!commands.isEmpty()) {
+                    String[] commandToPropagate = commands.poll();
+                    String respArray = respSerializer.serializeArray(commandToPropagate);
+                    byte[] bytes = respArray.getBytes();
+                    connectionPool.bytesSentToSlaves += bytes.length;
+                    CompletableFuture.runAsync(() -> propagate(commandToPropagate));
+                }
+
+                String response = respSerializer.serializeArray(client.transactionResponse);
+                client.send(response);
+            }
+            case "DISCARD" -> {
+                client.endTransaction();
+                client.send("+OK\r\n");
+            }
+        }
+    }
+
+    public ResponseDto caseHandler(String[] command, Client client) {
         byte[] data = null;
         String response = switch (command[0]) {
             case "PING" -> commandHandler.ping(command);
+            case "MULTI" -> {
+                if (client.beginTransaction()) {
+                    yield "+OK\r\n";
+                } else {
+                    yield "-ERR MULTI calls can not be nested\r\n";
+                }
+            }
+            case "EXEC" -> "-ERR EXEC without MULTI\r\n";
+            case "DISCARD" -> "-ERR DISCARD without MULTI\r\n";
             case "INCR" -> commandHandler.incr(command);
             case "ECHO" -> commandHandler.echo(command);
             case "SET" -> {
@@ -112,17 +175,17 @@ public class MasterTcpServer {
             }
             default -> "-ERR unknown command\r\n";
         };
-        client.send(response, data);
+        return new ResponseDto(response, data);
     }
 
     private void propagate(String[] command) {
         String commandRespString = respSerializer.serializeArray(command);
-        try {
-            for(Slave slave : connectionPool.getSlaves()) {
+        for(Slave slave : connectionPool.getSlaves()) {
+            try {
                 slave.send(commandRespString.getBytes());
+            } catch (IOException e) {
+                log.error("Error propagating command to slave: {}", e.getMessage());
             }
-        } catch (IOException e) {
-            log.error("Error propagating command to slaves: {}", e.getMessage());
         }
     }
 }

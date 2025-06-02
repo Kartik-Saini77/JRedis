@@ -25,6 +25,15 @@ public class RespSerializer {
         return sb.toString();
     }
 
+    public String serializeArray(List<String> command) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("*").append(command.size()).append("\r\n");
+        for (String cmd : command) {
+            sb.append(cmd); // Commands are already serialized
+        }
+        return sb.toString();
+    }
+
     public String serializeInteger(int value) {
         return ":" + value + "\r\n";
     }
