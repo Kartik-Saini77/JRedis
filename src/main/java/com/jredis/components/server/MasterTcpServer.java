@@ -4,6 +4,8 @@ import com.jredis.components.infra.Client;
 import com.jredis.components.infra.ConnectionPool;
 import com.jredis.components.infra.RedisConfig;
 import com.jredis.components.infra.Slave;
+import com.jredis.components.repository.Store;
+import com.jredis.components.repository.Value;
 import com.jredis.components.services.CommandHandler;
 import com.jredis.components.services.RespSerializer;
 import com.jredis.components.services.ResponseDto;
@@ -16,8 +18,10 @@ import java.net.Socket;
 import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 
 @Slf4j
 @Component
@@ -27,12 +31,14 @@ public class MasterTcpServer {
     private final CommandHandler commandHandler;
     private final RedisConfig redisConfig;
     private final ConnectionPool connectionPool;
+    private final Store store;
 
-    public MasterTcpServer(RespSerializer respSerializer, CommandHandler commandHandler, RedisConfig redisConfig, ConnectionPool connectionPool) {
+    public MasterTcpServer(RespSerializer respSerializer, CommandHandler commandHandler, RedisConfig redisConfig, ConnectionPool connectionPool, Store store) {
         this.respSerializer = respSerializer;
         this.commandHandler = commandHandler;
         this.redisConfig = redisConfig;
         this.connectionPool = connectionPool;
+        this.store = store;
     }
 
     public void startServer() {
@@ -112,8 +118,8 @@ public class MasterTcpServer {
 
                 Queue<String[]> commands = new LinkedList<>(client.commandQueue);
 
-                //execute the transaction
-
+                BiFunction<String[], Map<String, Value>, String> transactionCacheApplier = commandHandler.getTransactionCommandCacheApplier();
+                store.executeTransaction(client, transactionCacheApplier);
 
                 client.endTransaction();
                 while(!commands.isEmpty()) {

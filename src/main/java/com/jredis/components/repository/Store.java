@@ -6,15 +6,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiFunction;
 
 @Slf4j
 @Component
 public class Store {
     private final RespSerializer respSerializer;
-    public ConcurrentHashMap<String, Values> map;
+    public ConcurrentHashMap<String, Value> map;
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
     public Store(RespSerializer respSerializer) {
@@ -34,7 +35,7 @@ public class Store {
     public String set(String key, String value) {
         rwLock.writeLock().lock();
         try {
-            map.put(key, new Values(value, LocalDateTime.now(), LocalDateTime.MAX));
+            map.put(key, new Value(value, LocalDateTime.now(), LocalDateTime.MAX));
             return "+OK\r\n";
         } catch (Exception e) {
             log.error("Error setting value for key {}: {}", key, e.getMessage());
@@ -49,7 +50,7 @@ public class Store {
         try {
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime expiryTime = now.plusNanos(expiryMilliseconds * 1_000_000L);
-            map.put(key, new Values(value, now, expiryTime));
+            map.put(key, new Value(value, now, expiryTime));
 
             return "+OK\r\n";
         } catch (Exception e) {
@@ -64,7 +65,7 @@ public class Store {
         rwLock.readLock().lock();
         try {
             LocalDateTime now = LocalDateTime.now();
-            Values value = map.get(key);
+            Value value = map.getOrDefault(key, null);
 
             if (value != null) {
                 if (value.expiresAt.isBefore(now)) {
@@ -84,11 +85,11 @@ public class Store {
         }
     }
 
-    public Values getValue(String key) {
+    public Value getValue(String key) {
         rwLock.readLock().lock();
         try {
             LocalDateTime now = LocalDateTime.now();
-            Values value = map.getOrDefault(key, null);
+            Value value = map.getOrDefault(key, null);
 
             if (value != null && value.expiresAt.isBefore(now)) {
                 map.remove(key);
@@ -103,7 +104,30 @@ public class Store {
         }
     }
 
-    public void executeTransaction(Client client) {
-        //TODO: Implement transaction logic
+    public void executeTransaction(Client client, BiFunction<String[], Map<String, Value>, String> transactionCacheApplier) {
+        rwLock.writeLock().lock();
+        Map<String, Value> localMap = new HashMap<>();
+        List<String> responses = new ArrayList<>();
+        try {
+            while (!client.commandQueue.isEmpty()) {
+                String[] command = client.commandQueue.poll();
+                String response = transactionCacheApplier.apply(command, localMap);
+                responses.add(response);
+            }
+
+            for (String key : map.keySet()) {
+                Value value = map.get(key);
+
+                if (value.isDeletedInTransaction) {
+                    this.map.remove(key);
+                } else {
+                    this.map.put(key, value);
+                }
+            }
+
+            client.transactionResponse.addAll(responses);
+        } finally {
+            rwLock.writeLock().unlock();
+        }
     }
 }

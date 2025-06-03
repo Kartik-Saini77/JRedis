@@ -5,15 +5,18 @@ import com.jredis.components.infra.ConnectionPool;
 import com.jredis.components.infra.RedisConfig;
 import com.jredis.components.infra.Slave;
 import com.jredis.components.repository.Store;
-import com.jredis.components.repository.Values;
+import com.jredis.components.repository.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 
 @Slf4j
 @Component
@@ -176,7 +179,7 @@ public class CommandHandler {
     public String incr(String[] command) {
         String key = command[1];
         try {
-            Values value = store.getValue(command[1]);
+            Value value = store.getValue(command[1]);
             if (value == null) {
                 store.set(key, "0");
                 value = store.getValue(key);
@@ -190,5 +193,91 @@ public class CommandHandler {
         } catch (Exception e) {
             return "-ERR value is not an integer or out of range\r\n";
         }
+    }
+
+    public BiFunction<String[], Map<String, Value>, String> getTransactionCommandCacheApplier() {
+        final RespSerializer localSerializer = this.respSerializer;
+        final Store localStore = this.store;
+        return (String[] command, Map<String, Value> map) -> {
+            return switch (command[0]) {
+                case "SET" -> handleSetCommandTransactional(command, map, localSerializer, localStore);
+                case "GET" -> handleGetCommandTransactional(command, map, localSerializer, localStore);
+                case "INCR" -> handleIncrCommandTransactional(command, map, localSerializer, localStore);
+                case "DEL" -> handleDelCommandTransactional(command, map, localSerializer, localStore);
+                default -> "-ERR unknown command "+command[0]+"\r\n";
+            };
+        };
+    }
+
+    private String handleSetCommandTransactional(String[] command, Map<String, Value> map, RespSerializer localSerializer, Store localStore) {
+        String key = command[1];
+        Value newValue = new Value(command[2], LocalDateTime.now(), LocalDateTime.MAX);
+        map.put(key, newValue);
+        return "+OK\r\n";
+    }
+
+    private String handleGetCommandTransactional(String[] command, Map<String, Value> map, RespSerializer localSerializer, Store localStore) {
+        String key = command[1];
+        Value valueToUse;
+        Value cachedValue = map.get(key);
+        if (cachedValue == null) {
+            Value storeValue = store.getValue(key);
+            if (storeValue == null) {
+                return localStore.get(key);
+            } else {
+                valueToUse = new Value(storeValue.value, storeValue.createdAt, storeValue.expiresAt);
+                map.put(key, valueToUse);
+            }
+        } else {
+            valueToUse = cachedValue;
+        }
+        return localSerializer.serializeBulkString(valueToUse.value);
+    }
+
+    private String handleIncrCommandTransactional(String[] command, Map<String, Value> map, RespSerializer localSerializer, Store localStore) {
+        try {
+            String key = command[1];
+            Value valueToUse;
+            Value cachedValue = map.get(key);
+            if (cachedValue == null) {
+                Value storeValue = localStore.getValue(key);
+                if (storeValue == null) {
+                    valueToUse = new Value("0", LocalDateTime.now(), LocalDateTime.MAX);
+                } else {
+                    valueToUse = new Value(storeValue.value, storeValue.createdAt, storeValue.expiresAt);
+                }
+            } else {
+                valueToUse = cachedValue;
+            }
+
+            int val = Integer.parseInt(valueToUse.value);
+            val++;
+            valueToUse.value = val+"";
+            map.put(key, valueToUse);
+
+            return localSerializer.serializeInteger(val);
+        } catch (NumberFormatException e) {
+            return "-ERR value is not an integer or out of range\r\n";
+        }
+    }
+
+    private String handleDelCommandTransactional(String[] command, Map<String, Value> map, RespSerializer localSerializer, Store localStore) {
+        String key = command[1];
+        Value valueToUse;
+        Value cachedValue = map.get(key);
+        if (cachedValue == null) {
+            Value storeValue = store.getValue(key);
+            if (storeValue == null) {
+                return "-ERR key does not exist\r\n";
+            } else {
+                valueToUse = new Value(storeValue.value, storeValue.createdAt, storeValue.expiresAt);
+            }
+        } else {
+            valueToUse = cachedValue;
+        }
+
+        valueToUse.isDeletedInTransaction = true;
+        map.put(key, valueToUse);
+        return "+OK\r\n";
     }
 }

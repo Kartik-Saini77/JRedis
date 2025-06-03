@@ -41,17 +41,6 @@ public class Client {
         commandQueue = null;
     }
 
-    public void send(String res, byte[] data) {
-        try {
-            if (res != null && !res.isEmpty())
-                outputStream.write(res.getBytes());
-            if (data != null)
-                outputStream.write(data);
-        } catch (IOException e) {
-            log.error("Error sending response to master: {}", e.getMessage());
-        }
-    }
-
     public void send(ResponseDto res) {
         try {
             if (res != null) {

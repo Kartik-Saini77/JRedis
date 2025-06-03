@@ -246,6 +246,6 @@ public class SlaveTcpServer {
             }
             default -> "-ERR unknown command\r\n";
         };
-        client.send(response, data);
+        client.send(new ResponseDto(response, data));
     }
 }
